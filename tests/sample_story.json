@@ -1,0 +1,19 @@
+{
+  "series": "Akbar-Birbal",
+  "title_hi": "बीरबल और सोने का घड़ा",
+  "title_en": "Birbal and the Golden Pot",
+  "moral_hi": "ईमानदारी सबसे बड़ा खज़ाना है।",
+  "summary_en": "Test story: Birbal finds out which merchant is honest using a pot of gold.",
+  "extra_characters": [{"name": "Ramu", "look": "young farmer, blue turban, white dhoti"}],
+  "scenes": [
+    {"narration": "नमस्ते बच्चों! कहानी घर में आपका स्वागत है। आज की कहानी है, बीरबल और सोने का घड़ा। एक दिन बादशाह अकबर के दरबार में एक किसान रोता हुआ आया।", "image_prompt": "Akbar's court, Ramu the farmer entering crying, Akbar and Birbal looking at him"},
+    {"narration": "किसान ने कहा, जहाँपनाह, मेरा सोने का घड़ा खो गया है। बीरबल मुस्कुराए और बोले, चिंता मत करो, सच ज़रूर सामने आएगा।", "image_prompt": "Close-up of Birbal smiling kindly at Ramu"},
+    {"narration": "बीरबल ने एक छोटी सी तरकीब लगाई, और चोर ख़ुद ही पकड़ा गया। सबने बीरबल की बुद्धि की तारीफ़ की।", "image_prompt": "Wide shot of the court cheering for Birbal"},
+    {"narration": "तो बच्चों, इस कहानी से हमें क्या सीख मिलती है? ईमानदारी सबसे बड़ा खज़ाना है। फिर मिलेंगे एक नई कहानी के साथ!", "image_prompt": "Akbar and Birbal laughing together at sunset"}
+  ],
+  "thumbnail_text": "सोने का घड़ा किसका?",
+  "thumbnail_prompt": "Birbal holding a shining golden pot, surprised farmer",
+  "youtube_title": "बीरबल और सोने का घड़ा | Birbal and the Golden Pot | Hindi Kahani",
+  "youtube_description": "Test description.",
+  "tags": ["hindi kahani", "akbar birbal"]
+}

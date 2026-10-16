@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────
+#  Channel settings — edit these any time from GitHub (pencil icon)
+# ─────────────────────────────────────────────────────────────
+
+channel:
+  name: "Kahani Ghar"            # your channel name (shown in intro/outro)
+  language: "hi"
+  # What kind of stories to rotate between, in order. One per video.
+  series:
+    - "Akbar-Birbal (Birbal's wit and wisdom in Akbar's court)"
+    - "Panchatantra-style animal fable (jungle animals, clever and foolish characters)"
+    - "Tenali Raman (clever poet in King Krishnadevaraya's court)"
+    - "Original village moral tale (children, grandparents, farmers, shopkeepers in an Indian village)"
+  # Morals to favour (Claude picks one that fits and avoids repeats)
+  moral_themes: [honesty, kindness, hard work, sharing, patience, respecting elders,
+                 thinking before acting, not being greedy, courage, friendship,
+                 gratitude, not boasting, helping others, telling the truth]
+
+story:
+  minutes_target: 9              # aim for 8–10 minute videos
+  words_min: 1000                # Hindi narration word count limits
+  words_max: 1350
+  scenes_min: 20
+  scenes_max: 28
+  audience: "children aged 4-10 and their parents"
+  # Opening & closing lines Claude will adapt each time (keep them short)
+  intro_hint: "नमस्ते बच्चों! कहानी घर में आपका स्वागत है। आज की कहानी है…"
+  outro_hint: "तो बच्चों, इस कहानी से हमें क्या सीख मिलती है? … फिर मिलेंगे एक नई कहानी के साथ!"
+
+# Claude (writes the stories)
+claude:
+  model: "claude-sonnet-5-5"
+  max_tokens: 16000
+
+# Illustrations (Google Gemini API)
+images:
+  model: "gemini-3.1-flash-lite-image"        # ~$0.034 per image
+  fallback_models: ["gemini-nano-banana-2.1", "gemini-3.1-flash-image"]
+  aspect_ratio: "16:9"
+  style: >-
+    Warm, colourful 2D children's storybook illustration, soft painterly textures,
+    gentle lighting, expressive friendly faces, traditional Indian setting and clothing,
+    clean composition, no text, no letters, no watermark, child-safe
+  # Fixed looks so the same characters look the same in every video
+  cast:
+    Akbar: "Mughal emperor, middle-aged, neatly trimmed black beard, kind eyes, white and gold angarkha, jewelled turban with feather, pearl necklace"
+    Birbal: "clever minister, clean-shaven, round friendly face, small smile, orange turban, cream kurta with green sash, tilak on forehead"
+    Tenali Raman: "witty poet, thin, sharp nose, cheerful grin, white dhoti, red angavastram, small tuft of hair, tilak"
+    Krishnadevaraya: "south Indian king, tall, black moustache, golden crown, silk dhoti, jewellery"
+
+# Narration (ElevenLabs — your cloned voice)
+voice:
+  model: "eleven_multilingual_v2"
+  stability: 0.55
+  similarity_boost: 0.85
+  style: 0.25
+  speed: 0.95                    # slightly slow for kids
+  max_chars_per_video: 8000      # safety cap so one video never eats your monthly credits
+  pause_between_scenes: 0.6      # seconds
+
+video:
+  width: 1920
+  height: 1080
+  fps: 30
+  zoom: 0.12                     # slow Ken Burns zoom amount per scene
+  subtitles: true
+  music_volume: 0.08             # background music level (0 = off)
+
+youtube:
+  category_id: "1"               # Film & Animation
+  made_for_kids: true            # REQUIRED for kids content
+  contains_synthetic_media: true # AI disclosure (cloned voice / AI images)
+  # publish_mode:
+  #   "schedule" → uploaded privately, goes public automatically after the delay
+  #                 (you can watch it first and stop it in the YouTube Studio app)
+  #   "private"  → stays private until you publish it yourself
+  publish_mode: "schedule"
+  schedule_delay_hours: 24
