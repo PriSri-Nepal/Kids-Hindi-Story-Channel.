@@ -1,0 +1,121 @@
+name: Make weekly story video
+
+on:
+  schedule:
+    # Every Saturday 02:15 UTC = 08:00 Nepal time. With publish_mode "schedule" the video
+    # goes public 24h later (Sunday 08:00 Nepal) — a good time for kids' content.
+    - cron: "15 2 * * 6"
+  workflow_dispatch:         # lets you press "Run workflow" any time from the GitHub app/website
+    inputs:
+      topic:
+        description: "Optional story idea (leave empty for Claude to choose)"
+        required: false
+        default: ""
+      upload:
+        description: "Upload to YouTube?"
+        type: boolean
+        default: true
+      test_mode:
+        description: "Test mode: no API calls, just checks the video engine works"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # to remember which stories were already made
+  issues: write     # to notify you when a video is ready
+
+concurrency:
+  group: video
+  cancel-in-progress: false
+
+jobs:
+  make-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack the project zip (first run only)
+        run: |
+          if [ -f kids-story-channel.zip ]; then
+            unzip -q -o kids-story-channel.zip -d /tmp/unpack
+            cp -r /tmp/unpack/kids-story-channel/. .
+            git rm -q kids-story-channel.zip
+            git config user.name "story-bot"
+            git config user.email "story-bot@users.noreply.github.com"
+            git add -A -- . ':!.github'
+            git commit -q -m "Unpack project files"
+            git push
+          fi
+
+      - name: Install video tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ffmpeg libraqm0 fonts-noto-core
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Python packages
+        run: pip install -r requirements.txt
+
+      - name: Make the video
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          TOPIC: ${{ github.event.inputs.topic }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.test_mode }}" = "true" ]; then ARGS="--mock"; fi
+          if [ "${{ github.event.inputs.upload }}" = "false" ]; then ARGS="$ARGS --no-upload"; fi
+          python -m pipeline.run $ARGS --topic "$TOPIC"
+          echo "OUT=$(cat output/LATEST)" >> "$GITHUB_ENV"
+
+      - name: Save the video files (downloadable for 14 days)
+        if: always() && env.OUT != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-files
+          retention-days: 14
+          path: |
+            ${{ env.OUT }}/final.mp4
+            ${{ env.OUT }}/thumbnail.jpg
+            ${{ env.OUT }}/story.json
+
+      - name: Remember this story (so it's never repeated)
+        if: success() && github.event.inputs.test_mode != 'true'
+        run: |
+          git config user.name "story-bot"
+          git config user.email "story-bot@users.noreply.github.com"
+          git add data/
+          git commit -m "Add story: $(python -c "import json;print(json.load(open('data/stories_done.json'))[-1]['title_en'])")" || exit 0
+          git push
+
+      - name: Notify me
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            cat "$OUT/summary.md"
+            echo ""
+            echo "📦 Video & thumbnail files: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "_Close this issue once you've checked the video._"
+          } > body.md
+          gh issue create --title "🎬 New video ready: $(head -1 "$OUT/summary.md" | sed 's/^## //')" --body-file body.md
+
+      - name: Tell me if something broke
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "⚠️ Video run failed ($(date -u +%F))" \
+            --body "The weekly video run failed. Open the log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} — then paste the red error lines to Claude to fix it."
