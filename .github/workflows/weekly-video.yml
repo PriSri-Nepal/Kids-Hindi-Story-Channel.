@@ -35,16 +35,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Unpack the project zip (first run only)
+      - name: Unpack an uploaded project zip (only when you upload a new one)
         run: |
-          if [ -f kids-story-channel.zip ]; then
-            unzip -q -o kids-story-channel.zip -d /tmp/unpack
-            cp -r /tmp/unpack/kids-story-channel/. .
-            git rm -q kids-story-channel.zip
+          ZIP=$(ls kids-story-channel*.zip 2>/dev/null | head -1)
+          if [ -n "$ZIP" ]; then
+            unzip -q -o "$ZIP" -d /tmp/unpack
+            SRC=/tmp/unpack/kids-story-channel
+            # keep the list of stories already made
+            if [ -d data ]; then rm -rf "$SRC/data"; fi
+            rm -rf "$SRC/.github"
+            cp -r "$SRC/." .
+            git rm -q kids-story-channel*.zip
             git config user.name "story-bot"
             git config user.email "story-bot@users.noreply.github.com"
             git add -A -- . ':!.github'
-            git commit -q -m "Unpack project files"
+            git commit -q -m "Update project files from $ZIP"
             git push
           fi
 
@@ -63,13 +68,7 @@ jobs:
 
       - name: Make the video
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
-          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
-          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
-          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          ALL_SECRETS: ${{ toJSON(secrets) }}
           TOPIC: ${{ github.event.inputs.topic }}
         run: |
           ARGS=""
