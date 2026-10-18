@@ -80,7 +80,8 @@ CF_URL = "https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}"
 
 def _cloudflare(cfg: dict, prompt: str, seed: int) -> bytes:
     url = CF_URL.format(acct=env("CLOUDFLARE_ACCOUNT_ID"), model=cfg["images"]["cloudflare_model"])
-    body = {"prompt": prompt[:2000], "steps": cfg["images"].get("cloudflare_steps", 8), "seed": seed}
+    # FLUX schnell on Cloudflare accepts only "prompt" and "steps" (max 8)
+    body = {"prompt": prompt[:2000], "steps": min(int(cfg["images"].get("cloudflare_steps", 8)), 8)}
     r = http("POST", url, json=body, headers={"Authorization": f"Bearer {env('CLOUDFLARE_API_TOKEN')}"},
              timeout=180, retries=6)
     if r.status_code != 200:
