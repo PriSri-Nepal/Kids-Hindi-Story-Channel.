@@ -28,6 +28,12 @@ def load_config() -> dict:
 
 def env(name: str, required: bool = True) -> str:
     val = os.environ.get(name, "").strip()
+    if not val and os.environ.get("ALL_SECRETS"):
+        # the workflow passes every GitHub secret at once, so new services need no workflow edits
+        try:
+            val = str(json.loads(os.environ["ALL_SECRETS"]).get(name, "")).strip()
+        except json.JSONDecodeError:
+            pass
     if required and not val:
         sys.exit(f"Missing secret/env var: {name}. Add it in GitHub → Settings → Secrets → Actions.")
     return val

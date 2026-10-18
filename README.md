@@ -2,9 +2,9 @@
 
 Every Saturday this repo makes a complete 8–10 minute Hindi moral-story video and uploads it to YouTube:
 
-1. **Claude** writes a new story (Akbar-Birbal, Panchatantra, Tenali Raman or village tale — rotating, never repeating)
-2. **Gemini** draws ~24 storybook illustrations in a consistent style
-3. **ElevenLabs** narrates it in **your cloned voice**
+1. **Gemini** (free) writes a new story (Akbar-Birbal, Panchatantra, Tenali Raman or village tale — rotating, never repeating)
+2. **Cloudflare** (free) draws ~24 storybook illustrations
+3. **ElevenLabs** narrates it in **your own cloned voice**
 4. The video is assembled with gentle zoom, music and Hindi subtitles, plus a thumbnail
 5. It's uploaded to YouTube as **Made for Kids**, scheduled to go public 24 hours later
 6. You get a GitHub notification with the link — watch it on your phone, done
@@ -26,12 +26,6 @@ Every Saturday this repo makes a complete 8–10 minute Hindi moral-story video 
 | See all stories made | `data/stories_done.json` |
 | Fix an error | Open the ⚠️ issue, copy the red error lines from the log, paste to Claude |
 
-## Monthly cost (4 videos)
+## Monthly cost
 
-| Service | Cost |
-|---|---|
-| ElevenLabs Starter (your voice) | $6 |
-| Gemini illustrations (~25 × $0.034 per video) | ~$4 |
-| Claude API (story writing) | ~$1 |
-| GitHub, YouTube API | free |
-| **Total** | **~$11/month** |
+**$6/month** (ElevenLabs Starter for your voice). Stories, pictures, GitHub and YouTube are free. Optional upgrades are listed at the end of SETUP.md.

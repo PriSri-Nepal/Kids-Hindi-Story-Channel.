@@ -86,14 +86,74 @@ def generate_story(cfg: dict, topic: str | None = None) -> dict:
     history = read_json(DATA / "stories_done.json", [])
     series_list = cfg["channel"]["series"]
     series = series_list[len(history) % len(series_list)]
-    log(f"Writing story — series: {series}")
+    writer = cfg.get("providers", {}).get("writer", "claude")
+    log(f"Writing story with {writer} — series: {series}")
+    prompt = _prompt(cfg, series, history, topic)
+    if writer == "gemini":
+        return _gemini_story(cfg, prompt)
+    return _claude_story(cfg, prompt)
 
+
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+
+def _gemini_text(cfg: dict, contents: list, schema: dict) -> str:
+    key = env("GEMINI_API_KEY")
+    last = ""
+    for model in cfg["gemini_text"]["models"]:
+        for use_schema in (True, False):
+            gen = {"responseMimeType": "application/json", "temperature": 0.9, "maxOutputTokens": 32000}
+            if use_schema:
+                gen["responseJsonSchema"] = schema
+            r = http("POST", GEMINI_URL.format(model=model), json={"contents": contents, "generationConfig": gen},
+                     headers={"x-goog-api-key": key, "content-type": "application/json"}, timeout=600, retries=6)
+            if r.status_code == 200:
+                parts = r.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+                if text.strip():
+                    return text
+                last = f"{model}: empty answer {str(r.json())[:300]}"
+                break
+            last = f"{model}: HTTP {r.status_code} {r.text[:300]}"
+            if r.status_code == 400 and use_schema and "schema" in r.text.lower():
+                continue  # retry without the schema field
+            break  # try next model
+    raise RuntimeError(f"Gemini story writing failed: {last}")
+
+
+def _gemini_story(cfg: dict, prompt: str) -> dict:
+    import json
+    schema = STORY_TOOL["input_schema"]
+    instr = (prompt.replace("Call save_story with the result.", "")
+             + "\nAnswer with ONLY a JSON object with exactly these fields:\n"
+             + json.dumps(schema, ensure_ascii=False))
+    contents = [{"role": "user", "parts": [{"text": instr}]}]
+    for attempt in range(3):
+        raw = _gemini_text(cfg, contents, schema)
+        try:
+            story = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+            problems = check_story(cfg, story)
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            problems = [f"the answer was not valid JSON for the schema ({e})"]
+        if not problems:
+            log(f"Story ready: {story['title_hi']} ({story['title_en']}) — "
+                f"{len(story['scenes'])} scenes, {count_words(story)} words")
+            return story
+        log(f"  story needs fixing ({'; '.join(problems)}), asking for a revision…")
+        contents = contents[:1] + [
+            {"role": "model", "parts": [{"text": raw}]},
+            {"role": "user", "parts": [{"text": "Please fix this and answer again with the FULL corrected JSON: "
+                                                + "; ".join(problems)}]}]
+    raise RuntimeError("Could not get a story that meets the requirements after 3 tries.")
+
+
+def _claude_story(cfg: dict, prompt: str) -> dict:
     body = {
         "model": cfg["claude"]["model"],
         "max_tokens": cfg["claude"]["max_tokens"],
         "tools": [STORY_TOOL],
         "tool_choice": {"type": "tool", "name": "save_story"},
-        "messages": [{"role": "user", "content": _prompt(cfg, series, history, topic)}],
+        "messages": [{"role": "user", "content": prompt}],
     }
     headers = {"x-api-key": env("ANTHROPIC_API_KEY"), "anthropic-version": "2023-06-01",
                "content-type": "application/json"}

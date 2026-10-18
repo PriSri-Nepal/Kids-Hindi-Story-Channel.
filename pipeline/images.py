@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import io
+import zlib
 from pathlib import Path
 
 from PIL import Image
@@ -74,7 +75,52 @@ def ensure_character_sheet(cfg: dict) -> None:
     _save(_call(cfg, prompt, [], "16:9"), SHEET, (1920, 1080))
 
 
+CF_URL = "https://api.cloudflare.com/client/v4/accounts/{acct}/ai/run/{model}"
+
+
+def _cloudflare(cfg: dict, prompt: str, seed: int) -> bytes:
+    url = CF_URL.format(acct=env("CLOUDFLARE_ACCOUNT_ID"), model=cfg["images"]["cloudflare_model"])
+    body = {"prompt": prompt[:2000], "steps": cfg["images"].get("cloudflare_steps", 8), "seed": seed}
+    r = http("POST", url, json=body, headers={"Authorization": f"Bearer {env('CLOUDFLARE_API_TOKEN')}"},
+             timeout=180, retries=6)
+    if r.status_code != 200:
+        hint = " (free daily limit reached? it resets at 05:45 Nepal time)" if r.status_code == 429 else ""
+        raise RuntimeError(f"Cloudflare image error {r.status_code}{hint}: {r.text[:300]}")
+    if r.headers.get("content-type", "").startswith("image/"):
+        return r.content
+    data = r.json()
+    img = (data.get("result") or {}).get("image")
+    if not img:
+        raise RuntimeError(f"Cloudflare returned no image: {str(data)[:300]}")
+    return base64.b64decode(img)
+
+
+def _make_images_cloudflare(cfg: dict, story: dict, workdir: Path) -> list[Path]:
+    W, H = cfg["video"]["width"], cfg["video"]["height"]
+    style = cfg["images"]["style"]
+    frame = ("Wide horizontal cinematic composition: keep all characters and important action in the "
+             "middle band of the picture, plenty of background above and below.")
+    base_seed = zlib.crc32(story["title_en"].encode()) % 1_000_000
+    out = []
+    for i, sc in enumerate(story["scenes"], 1):
+        path = workdir / f"scene_{i:02d}.png"
+        if not path.exists():
+            log(f"  image {i}/{len(story['scenes'])}")
+            prompt = f"{style}. {frame} {_cast_text(cfg, story, sc['image_prompt'])}. Scene: {sc['image_prompt']}"
+            _save(_cloudflare(cfg, prompt, base_seed + i), path, (W, H))
+        out.append(path)
+    thumb_art = workdir / "thumb_art.png"
+    if not thumb_art.exists():
+        log("  thumbnail art")
+        prompt = (f"{style}, extra vibrant colours, high contrast. {frame} Characters on the right half. "
+                  f"{_cast_text(cfg, story, story['thumbnail_prompt'])}. {story['thumbnail_prompt']}. No text.")
+        _save(_cloudflare(cfg, prompt, base_seed), thumb_art, (1280, 720))
+    return out
+
+
 def make_images(cfg: dict, story: dict, workdir: Path) -> list[Path]:
+    if cfg.get("providers", {}).get("artist", "gemini") == "cloudflare":
+        return _make_images_cloudflare(cfg, story, workdir)
     ensure_character_sheet(cfg)
     W, H = cfg["video"]["width"], cfg["video"]["height"]
     style = cfg["images"]["style"]

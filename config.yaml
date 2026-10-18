@@ -27,14 +27,34 @@ story:
   intro_hint: "नमस्ते बच्चों! कहानी घर में आपका स्वागत है। आज की कहानी है…"
   outro_hint: "तो बच्चों, इस कहानी से हमें क्या सीख मिलती है? … फिर मिलेंगे एक नई कहानी के साथ!"
 
-# Claude (writes the stories)
+# ─────────────────────────────────────────────────────────────
+#  Which services to use. FREE setup = gemini / cloudflare / gemini
+#  Upgrade later by changing one word (and adding that service's secret):
+#    writer: "claude"       → better stories (~$1/month, needs ANTHROPIC_API_KEY)
+#    artist: "gemini"       → nicer, more consistent pictures (~$4/month)
+#    voice:  "elevenlabs"   → YOUR cloned voice ($6/month, needs ELEVENLABS_* secrets)
+# ─────────────────────────────────────────────────────────────
+providers:
+  writer: "gemini"
+  artist: "cloudflare"
+  voice: "elevenlabs"     # your cloned voice (ElevenLabs Starter plan)
+
+# Gemini free tier — story writing
+gemini_text:
+  models: ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]
+
+# Claude (paid option for story writing)
 claude:
   model: "claude-sonnet-5-5"
   max_tokens: 16000
 
-# Illustrations (Google Gemini API)
+# Illustrations
 images:
-  model: "gemini-3.1-flash-lite-image"        # ~$0.034 per image
+  # Cloudflare free option (FLUX.1 schnell, free 10,000 units/day ≈ 130 pictures)
+  cloudflare_model: "@cf/black-forest-labs/flux-1-schnell"
+  cloudflare_steps: 8
+  # Gemini paid option (~$0.034 per image, keeps characters more consistent)
+  model: "gemini-3.1-flash-lite-image"
   fallback_models: ["gemini-nano-banana-2.1", "gemini-3.1-flash-image"]
   aspect_ratio: "16:9"
   style: >-
@@ -48,7 +68,15 @@ images:
     Tenali Raman: "witty poet, thin, sharp nose, cheerful grin, white dhoti, red angavastram, small tuft of hair, tilak"
     Krishnadevaraya: "south Indian king, tall, black moustache, golden crown, silk dhoti, jewellery"
 
-# Narration (ElevenLabs — your cloned voice)
+# Free narration — Google Gemini text-to-speech (speaks Hindi)
+gemini_voice:
+  models: ["gemini-3.8-flash-tts", "gemini-3.8-flash-lite-tts"]
+  # Try others: Kore, Aoede, Leda, Zephyr (female) · Puck, Charon, Orus, Fenrir (male)
+  voice: "Kore"
+  style: "a warm, gentle Indian grandmother telling a bedtime story to small children; expressive, smiling, unhurried"
+  max_chars_per_request: 1400
+
+# Narration with your cloned voice (ElevenLabs, paid)
 voice:
   model: "eleven_multilingual_v2"
   stability: 0.55
