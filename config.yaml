@@ -50,9 +50,10 @@ claude:
 
 # Illustrations
 images:
-  # Cloudflare free option (FLUX.1 schnell, free 10,000 units/day ≈ 130 pictures)
+  # Cloudflare free option (FLUX.1 schnell, free 10,000 units/day)
   cloudflare_model: "@cf/black-forest-labs/flux-1-schnell"
-  cloudflare_steps: 8
+  cloudflare_steps: 4          # Cloudflare's default; 8 uses twice the free allowance
+  scenes_per_picture: 2        # each picture is used for 2 scenes (different camera moves) → half the pictures
   # Gemini paid option (~$0.034 per image, keeps characters more consistent)
   model: "gemini-3.1-flash-lite-image"
   fallback_models: ["gemini-nano-banana-2.1", "gemini-3.1-flash-image"]

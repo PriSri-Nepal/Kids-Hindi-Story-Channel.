@@ -102,14 +102,20 @@ def _make_images_cloudflare(cfg: dict, story: dict, workdir: Path) -> list[Path]
     frame = ("Wide horizontal cinematic composition: keep all characters and important action in the "
              "middle band of the picture, plenty of background above and below.")
     base_seed = zlib.crc32(story["title_en"].encode()) % 1_000_000
-    out = []
-    for i, sc in enumerate(story["scenes"], 1):
-        path = workdir / f"scene_{i:02d}.png"
+    scenes = story["scenes"]
+    per = max(1, int(cfg["images"].get("scenes_per_picture", 2)))
+    groups = [list(range(i, min(i + per, len(scenes)))) for i in range(0, len(scenes), per)]
+    log(f"  {len(groups)} pictures for {len(scenes)} scenes")
+    out: list[Path] = [None] * len(scenes)
+    for g, idx in enumerate(groups, 1):
+        path = workdir / f"picture_{g:02d}.png"
         if not path.exists():
-            log(f"  image {i}/{len(story['scenes'])}")
-            prompt = f"{style}. {frame} {_cast_text(cfg, story, sc['image_prompt'])}. Scene: {sc['image_prompt']}"
-            _save(_cloudflare(cfg, prompt, base_seed + i), path, (W, H))
-        out.append(path)
+            log(f"  picture {g}/{len(groups)}")
+            desc = " Then: ".join(scenes[i]["image_prompt"] for i in idx[:2])
+            prompt = f"{style}. {frame} {_cast_text(cfg, story, desc)}. Scene: {desc}"
+            _save(_cloudflare(cfg, prompt, base_seed + g), path, (W, H))
+        for i in idx:
+            out[i] = path
     thumb_art = workdir / "thumb_art.png"
     if not thumb_art.exists():
         log("  thumbnail art")
