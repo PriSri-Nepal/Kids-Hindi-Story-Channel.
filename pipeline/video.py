@@ -1,8 +1,10 @@
 """Step 4 — assemble the video: slow zoom on each picture, narration, music, Hindi subtitles."""
 from __future__ import annotations
 
+import json
 import random
 import re
+import subprocess
 from pathlib import Path
 
 from .common import ASSETS, FONTS, duration, log, run
@@ -99,10 +101,17 @@ def make_video(cfg: dict, story: dict, images: list[Path], voices: list[Path], w
              "-ar", "44100", "-ac", "2", str(wav)])
         auds.append(wav)
 
-        seg = workdir / f"v_{i:02d}.mp4"
-        log(f"  rendering scene {i}/{len(images)} ({seg_len:.1f}s)")
-        _segment(cfg, img, seg_len, MOVES[(i - 1) % len(MOVES)], seg)
-        segs.append(seg)
+        shots = img if isinstance(img, (list, tuple)) else [img]
+        # never keep one picture on screen too long: split long shots further
+        max_shot = float(cfg["video"].get("max_shot_seconds", 8))
+        n_parts = max(len(shots), int(-(-seg_len // max_shot)))
+        part = seg_len / n_parts
+        log(f"  rendering scene {i}/{len(images)} ({seg_len:.1f}s, {n_parts} shots)")
+        for k in range(n_parts):
+            seg = workdir / f"v_{i:02d}_{k:02d}.mp4"
+            move = MOVES[(i + k) % len(MOVES)]
+            _segment(cfg, shots[k % len(shots)], part, move, seg)
+            segs.append(seg)
         t += seg_len
 
     for name, items in (("video_list.txt", segs), ("audio_list.txt", auds)):
@@ -111,6 +120,20 @@ def make_video(cfg: dict, story: dict, images: list[Path], voices: list[Path], w
          "-c", "copy", str(workdir / "silent.mp4")])
     run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(workdir / "audio_list.txt"),
          "-c", "pcm_s16le", str(workdir / "narration.wav")])
+
+    # Even out and raise the narration volume (YouTube plays at about -14 LUFS)
+    voice_chain = ("highpass=f=70,acompressor=threshold=0.08:ratio=3:attack=5:release=150:makeup=2,"
+                   "loudnorm=I=-14:TP=-1.0:LRA=7")
+    res = subprocess.run(["ffmpeg", "-hide_banner", "-i", str(workdir / "narration.wav"), "-af",
+                          voice_chain + ":print_format=json", "-f", "null", "-"], capture_output=True, text=True)
+    try:
+        m = json.loads(res.stderr[res.stderr.rindex("{"): res.stderr.rindex("}") + 1])
+        voice_chain += (f":measured_I={m['input_i']}:measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}"
+                        f":measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true")
+    except (ValueError, KeyError):
+        pass
+    run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(workdir / "narration.wav"), "-af", voice_chain,
+         "-ar", "44100", "-ac", "2", str(workdir / "narration_loud.wav")])
 
     ass = workdir / "subs.ass"
     _write_ass(cfg, story, timings, ass)
@@ -121,14 +144,14 @@ def make_video(cfg: dict, story: dict, images: list[Path], voices: list[Path], w
     # complex shaping = correct Hindi matras and conjuncts
     sub_filter = f"ass=filename='{ass.resolve()}':fontsdir='{FONTS.resolve()}':shaping=complex"
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(workdir / "silent.mp4"),
-           "-i", str(workdir / "narration.wav")]
+           "-i", str(workdir / "narration_loud.wav")]
     if music and vol > 0:
         log(f"  background music: {music.name}")
         cmd += ["-stream_loop", "-1", "-i", str(music), "-filter_complex",
                 f"[0:v]{sub_filter}[v];[2:a]volume={vol},afade=t=in:d=2,afade=t=out:st={max(t - 3, 0):.2f}:d=3[m];"
-                f"[1:a][m]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-16:TP=-1.5[a]"]
+                f"[1:a][m]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.95[a]"]
     else:
-        cmd += ["-filter_complex", f"[0:v]{sub_filter}[v];[1:a]loudnorm=I=-16:TP=-1.5[a]"]
+        cmd += ["-filter_complex", f"[0:v]{sub_filter}[v];[1:a]anull[a]"]
     cmd += ["-map", "[v]", "-map", "[a]", "-t", f"{t:.3f}", "-c:v", "libx264", "-preset", "medium", "-crf", "20",
             "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-movflags", "+faststart", str(out)]
     log("  final render (this takes a few minutes)…")

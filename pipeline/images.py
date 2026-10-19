@@ -103,19 +103,25 @@ def _make_images_cloudflare(cfg: dict, story: dict, workdir: Path) -> list[Path]
              "middle band of the picture, plenty of background above and below.")
     base_seed = zlib.crc32(story["title_en"].encode()) % 1_000_000
     scenes = story["scenes"]
-    per = max(1, int(cfg["images"].get("scenes_per_picture", 2)))
-    groups = [list(range(i, min(i + per, len(scenes)))) for i in range(0, len(scenes), per)]
-    log(f"  {len(groups)} pictures for {len(scenes)} scenes")
-    out: list[Path] = [None] * len(scenes)
-    for g, idx in enumerate(groups, 1):
-        path = workdir / f"picture_{g:02d}.png"
-        if not path.exists():
-            log(f"  picture {g}/{len(groups)}")
-            desc = " Then: ".join(scenes[i]["image_prompt"] for i in idx[:2])
-            prompt = f"{style}. {frame} {_cast_text(cfg, story, desc)}. Scene: {desc}"
-            _save(_cloudflare(cfg, prompt, base_seed + g), path, (W, H))
-        for i in idx:
-            out[i] = path
+    shots = max(1, int(cfg["images"].get("shots_per_scene", 2)))
+    framings = cfg["images"].get("shot_framings") or [
+        "wide shot showing the whole setting and all characters",
+        "medium close-up on the main characters' faces and expressions",
+        "different angle, over-the-shoulder view of the action",
+    ]
+    log(f"  {len(scenes) * shots} pictures ({shots} per scene)")
+    out: list[list[Path]] = []
+    for i, sc in enumerate(scenes, 1):
+        group = []
+        for k in range(shots):
+            path = workdir / f"scene_{i:02d}_{k + 1}.png"
+            if not path.exists():
+                log(f"  picture {i}.{k + 1}/{len(scenes)}")
+                prompt = (f"{style}. {frame} Camera: {framings[k % len(framings)]}. "
+                          f"{_cast_text(cfg, story, sc['image_prompt'])}. Scene: {sc['image_prompt']}")
+                _save(_cloudflare(cfg, prompt, base_seed + i * 10 + k), path, (W, H))
+            group.append(path)
+        out.append(group)
     thumb_art = workdir / "thumb_art.png"
     if not thumb_art.exists():
         log("  thumbnail art")
